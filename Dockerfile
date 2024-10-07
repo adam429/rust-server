@@ -1,4 +1,4 @@
-FROM rust:1.80 as base
+FROM rust:1.80 as builder
 WORKDIR /app
 ADD . /app
 RUN cargo build --release --bin server
