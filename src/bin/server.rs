@@ -1,6 +1,5 @@
 use std::net::UdpSocket;
 use std::net::SocketAddr;
-use std::net::Ipv4Addr;
 use std::error::Error;
 use std::collections::HashMap;
 use chrono::NaiveDateTime;
@@ -19,6 +18,9 @@ use controller::{FlightController};
 #[path = "../serialization.rs"]
 mod serialization;
 use serialization::{ByteOrder, Deserializer, Serializer, Value};
+
+#[path = "../log.rs"]
+mod log;
 
 /// 初始化航班控制器并添加示例航班
 fn init_flight_controller() -> FlightController {
@@ -60,13 +62,14 @@ fn init_flight_controller() -> FlightController {
 
 /// 主函数：启动UDP服务器并处理客户端请求
 fn main() -> Result<(), Box<dyn Error>> {
+    log::init();
     // 加载配置
     let config = Config::load().expect("Failed to load config");
     // 初始化航班控制器
     let mut flight_controller = &mut init_flight_controller();
     // 绑定UDP socket
     let socket = UdpSocket::bind(&config.server.address)?;
-    println!("UDP Server listening on {}", config.server.address);
+    tracing::info!("UDP Server listening on {}", config.server.address);
 
     let mut buf = [0; 4096];
     loop {
@@ -81,12 +84,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                         println!("Sent response to {}", src);
                     }
                     Err(e) => {
-                        eprintln!("Error processing request: {}", e);
+                        tracing::error!("Error processing request: {}", e);
                     }
                 }
             }
             Err(e) => {
-                eprintln!("Couldn't receive a datagram: {}", e);
+                tracing::error!("Couldn't receive a datagram: {}", e);
             }
         }
     }
@@ -97,8 +100,8 @@ fn handle_request(data: &[u8],  mut controller: &mut FlightController, src: Sock
     // 反序列化请求数据
     let mut deserializer = Deserializer::new(data, ByteOrder::Little);
     let payload = deserializer.deserialize_next()?;
-    println!("----------------------------------");
-    println!("{:?} Request: {:?}", src, payload);
+    tracing::info!("----------------------------------");
+    tracing::info!("{:?} Request: {:?}", src, payload);
 
     let client_addr = src.to_string();
     let payload = payload.as_map().ok_or("Invalid payload format")?;
@@ -126,7 +129,7 @@ fn handle_request(data: &[u8],  mut controller: &mut FlightController, src: Sock
     // 添加request_id到响应中
     response.insert("request_id".to_string(), request_id.to_string());
 
-    println!("Response: {:?}", response);
+    tracing::info!("Response: {:?}", response);
 
     // 序列化响应数据
     let mut serializer = Serializer::new(ByteOrder::Little);
@@ -142,7 +145,7 @@ fn query_flight_ids(payload: &HashMap<String, Value>, controller: &mut FlightCon
     let request = controller::Request::QueryFlightIds { source: source.to_string(), destination: destination.to_string() };
     let response = controller.handle_request(request, &socket, None); 
 
-    println!("response: {:?}", response);
+    tracing::info!("response: {:?}", response);
 
     match response {
         controller::Response::FlightIds(flight_ids) => {
@@ -179,9 +182,9 @@ fn query_flight_details(payload: &HashMap<String, Value>, controller: &mut Fligh
     let flight_id = payload.get("flight_id").unwrap().as_string().unwrap();
 
     let request = controller::Request::QueryFlightDetails { flight_id: flight_id.parse::<i32>().unwrap() };
-    println!("request: {:?}", request);
+    tracing::info!("request: {:?}", request);
     let response = controller.handle_request(request, &socket, None);
-    println!("response: {:?}", response);
+    tracing::info!("response: {:?}", response);
 
     match response {
         controller::Response::FlightDetails { departure_time, airfare, seats_available } => {
@@ -213,9 +216,9 @@ fn reserve_seats(payload: &HashMap<String, Value>, controller: &mut FlightContro
     let seats = payload.get("seats").unwrap().as_string().unwrap();
 
     let request = controller::Request::ReserveSeats { flight_id: flight_id.parse::<i32>().unwrap(), seats: seats.parse::<i32>().unwrap() };
-    println!("request: {:?}", request);
+    tracing::info!("request: {:?}", request);
     let response = controller.handle_request(request, &socket, None);
-    println!("response: {:?}", response);
+    tracing::info!("response: {:?}", response);
 
     match response {
         controller::Response::Reservation(reservation_result) => {
@@ -251,9 +254,9 @@ fn monitor_flight(payload: &HashMap<String, Value>, controller: &mut FlightContr
     let monitor_interval = payload.get("monitor_interval").unwrap().as_string().unwrap().parse::<i32>().unwrap();
 
     let request = controller::Request::MonitorFlight { flight_id: flight_id, monitor_interval: monitor_interval };
-    println!("request: {:?}", request);
+    tracing::info!("request: {:?}", request);
     let response = controller.handle_request(request, &socket, Some(client_addr));
-    println!("response: {:?}", response);
+    tracing::info!("response: {:?}", response);
 
     match response {
         controller::Response::MonitoringStarted(monitor_result) => {
