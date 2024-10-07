@@ -4,7 +4,6 @@ ADD . /app
 RUN cargo build --release --bin server
 
 FROM ubuntu:22.04
-ARG ENV_FILE
 WORKDIR /app
 RUN apt update && \
     apt install -y ca-certificates
