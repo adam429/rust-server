@@ -1,0 +1,34 @@
+# This is a basic workflow that is manually triggered
+name: Deploy DEV workflow
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+jobs:
+  # test:
+  #   ...
+  deploy-Dev:
+    name: "Deploy to Dev"
+    runs-on: ubuntu-latest
+    # needs: test
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/dev.key
+          chmod 600 ~/.ssh/dev.key
+          cat >>~/.ssh/config <<END
+          Host dev
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/dev.key
+            StrictHostKeyChecking no
+          END
+        env:
+          SSH_USER: ${{ secrets.DEV_SSH_USER }}
+          SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+          SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+
+      - name: Deploy
+        run: ssh dev 'cd projects && ./deploy-server.sh'
