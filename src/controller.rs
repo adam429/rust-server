@@ -1,10 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use std::net::SocketAddr;
 use std::net::UdpSocket;
 mod serialization;
-use serialization::{ByteOrder, Deserializer, Serializer, Value};
+use serialization::{ByteOrder,  Serializer};
 
 mod flight_models;
 pub use flight_models::{Flight, Request, Response, FlightUpdate, MonitoringClient};
@@ -63,7 +62,7 @@ impl FlightController {
                         // Send updates to monitoring clients
                         for (client_addr, update) in updates {
                             if update.flight_id == flight_id && seats > 0 {
-                                println!("Sending Update to {:?}", client_addr);
+                                tracing::info!("Sending Update to {:?}", client_addr);
 
                                 // Serialize the update data
                                 let mut serializer = Serializer::new(ByteOrder::Little);
@@ -128,7 +127,7 @@ impl FlightController {
                 .entry(flight_id)
                 .or_insert_with(HashSet::new)
                 .insert(client);
-            println!("Monitoring Clients {:?}", self.monitoring_clients);
+            tracing::info!("Monitoring Clients {:?}", self.monitoring_clients);
             Ok(())
         } else {
             Err("Flight not found".to_string())
