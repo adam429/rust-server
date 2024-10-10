@@ -1,2 +1,10 @@
 [server]
+#address = "18.141.209.212:8888"
 address = "127.0.0.1:8888"
+loss_rate = 0.4
+
+[client]
+timeout = 10
+retry = 8
+#invocation_semantic = "at-least-once"
+invocation_semantic = "at-most-once"  

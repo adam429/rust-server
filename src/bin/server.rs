@@ -4,6 +4,8 @@ use std::net::Ipv4Addr;
 use std::error::Error;
 use std::collections::HashMap;
 use chrono::NaiveDateTime;
+use chrono::Utc;
+use std::sync::{Arc, Mutex};
 
 // 导入配置模块
 #[path = "../config.rs"]
@@ -58,6 +60,17 @@ fn init_flight_controller() -> FlightController {
     controller
 }
 
+struct RequestInfo {
+    timestamp: NaiveDateTime,
+    response: Vec<u8>,
+}
+
+// 创建一个全局的store_request
+lazy_static::lazy_static! {
+    static ref STORE_REQUEST: Arc<Mutex<HashMap<String, RequestInfo>>> = Arc::new(Mutex::new(HashMap::new()));
+}
+
+
 /// 主函数：启动UDP服务器并处理客户端请求
 fn main() -> Result<(), Box<dyn Error>> {
     // 加载配置
@@ -73,16 +86,80 @@ fn main() -> Result<(), Box<dyn Error>> {
         match socket.recv_from(&mut buf) {
             Ok((amt, src)) => {
                 let request_data = &buf[..amt];
-                
-                // 处理客户端请求
-                match handle_request(request_data, flight_controller, src, &socket) {
-                    Ok(response) => {
-                        socket.send_to(&response, src)?;
-                        println!("Sent response to {}", src);
+
+                let mut deserializer = Deserializer::new(request_data, ByteOrder::Little);
+                let payload = deserializer.deserialize_next()?;
+                let payload = payload.as_map().ok_or("Invalid payload format")?;
+
+                let request_id = payload.get("request_id").unwrap().as_string().unwrap();
+                let invocation_semantic = payload.get("invocation_semantic").unwrap().as_string().unwrap();
+                println!("----------------------------------");
+                println!("request_id: {}", request_id);
+                println!("invocation_semantic: {}", invocation_semantic);
+            
+                if invocation_semantic == "at-least-once" {
+                    // 处理客户端请求
+                    match handle_request(request_data, flight_controller, src, &socket) {
+                        Ok(response) => {
+                            let loss_rate = config.server.loss_rate;
+                            let random_number = rand::random::<f32>();
+
+                            // 在发送响应之前，将响应存储到全局store_request中
+                            let mut store = STORE_REQUEST.lock().unwrap();
+                            store.insert(request_id.to_string(), RequestInfo {
+                                timestamp: Utc::now().naive_utc(),
+                                response: response.clone(),
+                            });
+
+                            println!("store len: {}", store.len());
+                                                        
+                            if random_number > loss_rate {
+                                socket.send_to(&response, src)?;
+                                println!("Sent response to {}", src);
+                            } else {
+                                println!("Loss Rate Triggered: Dropped response");
+                            }
+
+                        }
+                        Err(e) => {
+                            eprintln!("Error processing request: {}", e);
+                        }
                     }
-                    Err(e) => {
-                        eprintln!("Error processing request: {}", e);
+                }
+                if invocation_semantic == "at-most-once" {
+
+                    let store = STORE_REQUEST.lock().unwrap();
+                    if let Some(info) = store.get(request_id) {
+                        // 如果已经处理过，直接发送存储的响应
+                        socket.send_to(&info.response, src)?;
+                        println!("Sent cached response to {}", src);
+                    } else {
+                        // 如果是新请求，处理并存储响应
+                        drop(store); // 释放锁
+                        match handle_request(request_data, flight_controller, src, &socket) {
+                            Ok(response) => {
+                                let loss_rate = config.server.loss_rate;
+                                let random_number = rand::random::<f32>();
+
+                                let mut store = STORE_REQUEST.lock().unwrap();
+                                store.insert(request_id.to_string(), RequestInfo {
+                                    timestamp: Utc::now().naive_utc(),
+                                    response: response.clone(),
+                                });
+
+                                if random_number > loss_rate {
+                                    socket.send_to(&response, src)?;
+                                    println!("Sent response to {}", src);
+                                } else {
+                                    println!("Loss Rate Triggered: Dropped response");
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Error processing request: {}", e);
+                            }
+                        }
                     }
+
                 }
             }
             Err(e) => {

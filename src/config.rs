@@ -7,6 +7,7 @@ use std::fs; // 用于文件系统操作
 #[derive(Deserialize)]
 pub struct Config {
     pub server: ServerConfig, // 包含服务器配置的嵌套结构
+    pub client: ClientConfig, // 包含客户端配置的嵌套结构
 }
 
 // 定义ServerConfig结构体
@@ -14,6 +15,15 @@ pub struct Config {
 #[derive(Deserialize)]
 pub struct ServerConfig {
     pub address: String, // 服务器地址,作为字符串存储
+    pub loss_rate: f32, // 丢包率
+}
+
+// 定义ClientConfig结构体
+#[derive(Deserialize)]
+pub struct ClientConfig {
+    pub timeout: u32, // 超时时间
+    pub retry: u32, // 重试次数
+    pub invocation_semantic: String, // 调用语义
 }
 
 // 为Config结构体实现方法
