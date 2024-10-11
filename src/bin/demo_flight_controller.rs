@@ -72,6 +72,10 @@ fn main() {
     let response = controller.handle_request(request, &socket, Some(client_addr) );
     println!("ReserveSeats (flight_id: 1, seats: 2) response: {:?}", response);
 
+    // let request = controller::Request::ReserveSeats { flight_id: 0, seats: 50 };
+    // let response = controller.handle_request(request, &socket, Some(client_addr) );
+    // println!("ReserveSeats (flight_id: 0, seats: 50) response: {:?}", response);
+
     // Test QueryFlightDetails
     let request = controller::Request::QueryFlightDetails { flight_id: 1 };
     let response = controller.handle_request(request, &socket, Some(client_addr) );
@@ -116,4 +120,39 @@ fn main() {
     for (id, flight) in controller.flights() {
         println!("Flight {}: {:?}", id, flight);
     }
+
+
+    let request = controller::Request::ReserveSeatsCheapestPrice {        
+        source: "New York".to_string(),
+        destination: "London".to_string(),
+    };  
+    let response = controller.handle_request(request, &socket, Some(client_addr));
+    println!("ReserveSeatsCheapestPrice (New York->London) response: {:?}", response);
+
+    println!("Final state of flights:");
+    for (id, flight) in controller.flights() {
+        println!("Flight {}: {:?}", id, flight);
+    }
+
+
+    let request = controller::Request::ReserveSeatsBelowPrice {        
+        source: "New York".to_string(),
+        destination: "London".to_string(),
+        max_price: 600.0,
+    };  
+    let response = controller.handle_request(request, &socket, Some(client_addr));
+    println!("ReserveSeatsBelowPrice (New York->London) response: {:?}", response);
+
+    println!("Final state of flights:");
+    for (id, flight) in controller.flights() {
+        println!("Flight {}: {:?}", id, flight);
+    }
+
+    controller.reset_flights();
+
+    println!("Final state of flights:");
+    for (id, flight) in controller.flights() {
+        println!("Flight {}: {:?}", id, flight);
+    }
+
 }

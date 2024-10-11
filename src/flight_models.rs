@@ -37,6 +37,20 @@ pub enum Request {
         flight_id: i32,        // ID of the flight to monitor
         monitor_interval: i32  // Interval (in seconds) for monitoring updates
     },
+
+    ReserveSeatsCheapestPrice { 
+        source: String,
+        destination: String,
+    },
+
+    ReserveSeatsBelowPrice { 
+        source: String,
+        destination: String,
+        max_price: f32,
+    },
+
+    ResetFlights,
+
 }
 
 /// Enum representing different types of responses from the flight system
@@ -58,6 +72,12 @@ pub enum Response {
     
     /// Response to a flight monitoring request
     MonitoringStarted(Result<(), String>),  // Ok(()) if started successfully, Err(String) if failed
+
+    ReserveSeatsCheapestPrice(Result<(), String>),
+
+    ReserveSeatsBelowPrice(Result<(), String>),
+
+    ResetFlights(Result<(), String>),
     
     /// General error response
     Error(String),  // Description of the error

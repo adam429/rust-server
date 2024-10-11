@@ -4,7 +4,7 @@ address = "0.0.0.0:8888"
 loss_rate = 0.4
 
 [client]
-timeout = 10
+timeout = 1
 retry = 8
 #invocation_semantic = "at-least-once"
 invocation_semantic = "at-most-once"  

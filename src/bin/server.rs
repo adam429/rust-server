@@ -200,6 +200,9 @@ fn handle_request(data: &[u8],  mut controller: &mut FlightController, src: Sock
         "2" => query_flight_details(&payload, controller, socket),
         "3" => reserve_seats(payload, &mut controller, socket),
         "4" => monitor_flight(payload, &mut controller, src, socket),
+        "6" => reserve_seats_cheapest_price(payload, &mut controller, socket),
+        "7" => reserve_seats_below_price(payload, &mut controller, socket),
+        "8" => reset_flights(payload, &mut controller, socket),
         _ => Err("Invalid action".into()),
     }?;
 
@@ -324,6 +327,43 @@ fn reserve_seats(payload: &HashMap<String, Value>, controller: &mut FlightContro
         }
     }
 }
+
+fn reset_flights(payload: &HashMap<String, Value>, controller: &mut FlightController, socket: &UdpSocket) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let request = controller::Request::ResetFlights;
+    let response = controller.handle_request(request, &socket, None);
+    tracing::info!("response: {:?}", response);
+
+    let mut data = HashMap::new();
+    data.insert("status".to_string(), "200".to_string());
+    Ok(data)
+}
+
+fn reserve_seats_cheapest_price(payload: &HashMap<String, Value>, controller: &mut FlightController, socket: &UdpSocket) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let source = payload.get("source").unwrap().as_string().unwrap();
+    let destination = payload.get("destination").unwrap().as_string().unwrap(); 
+
+    let request = controller::Request::ReserveSeatsCheapestPrice { source: source.to_string(), destination: destination.to_string() };
+    let response = controller.handle_request(request, &socket, None);
+    tracing::info!("response: {:?}", response); 
+
+    let mut data = HashMap::new();
+    data.insert("status".to_string(), "200".to_string());
+    Ok(data)
+}
+
+fn reserve_seats_below_price(payload: &HashMap<String, Value>, controller: &mut FlightController, socket: &UdpSocket) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let source = payload.get("source").unwrap().as_string().unwrap();
+    let destination = payload.get("destination").unwrap().as_string().unwrap(); 
+    let max_price = payload.get("max_price").unwrap().as_string().unwrap();
+
+    let request = controller::Request::ReserveSeatsBelowPrice { source: source.to_string(), destination: destination.to_string(), max_price: max_price.parse::<f32>().unwrap() };
+    let response = controller.handle_request(request, &socket, None);
+    tracing::info!("response: {:?}", response);
+
+    let mut data = HashMap::new();
+    data.insert("status".to_string(), "200".to_string());
+    Ok(data)
+}   
 
 /// 监控航班
 fn monitor_flight(payload: &HashMap<String, Value>, controller: &mut FlightController, client_addr: SocketAddr, socket: &UdpSocket) -> Result<HashMap<String, String>, Box<dyn Error>> {

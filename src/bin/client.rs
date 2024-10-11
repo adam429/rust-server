@@ -191,6 +191,62 @@ fn send_request(request: Request, socket: &UdpSocket) -> Result<Response, io::Er
                 Ok(Response::MonitoringStarted(Err(result.get("message").unwrap().to_owned())))
             }
         }
+        Request::ReserveSeatsCheapestPrice { source, destination } => {
+            // 构建预订最便宜座位的请求
+            map.insert("request_id".to_string(), request_id);
+            map.insert("invocation_semantic".to_string(), invocation_semantic);
+            map.insert("action".to_string(), 6.to_string());
+            map.insert("source".to_string(), source);
+            map.insert("destination".to_string(), destination);
+
+            // 序列化并发送请求
+            let result = send_request_and_receive_response(map, socket).unwrap();
+
+            // 处理响应数据
+            let status = result.get("status").unwrap();
+            if status == "200" {
+                Ok(Response::Reservation(Ok(())))
+            } else {
+                Ok(Response::Reservation(Err(result.get("message").unwrap().to_owned())))
+            }
+        }
+        Request::ReserveSeatsBelowPrice { source, destination, max_price } => {
+            // 构建预订低于指定价格的座位的请求
+            map.insert("request_id".to_string(), request_id);
+            map.insert("invocation_semantic".to_string(), invocation_semantic);
+            map.insert("action".to_string(), 7.to_string());
+            map.insert("source".to_string(), source);
+            map.insert("destination".to_string(), destination);
+            map.insert("max_price".to_string(), max_price.to_string());
+
+            // 序列化并发送请求
+            let result = send_request_and_receive_response(map, socket).unwrap();
+
+            // 处理响应数据
+            let status = result.get("status").unwrap();
+            if status == "200" {
+                Ok(Response::Reservation(Ok(())))
+            } else {
+                Ok(Response::Reservation(Err(result.get("message").unwrap().to_owned())))
+            }
+        }
+        Request::ResetFlights => {
+            // 构建重置航班的请求
+            map.insert("request_id".to_string(), request_id);
+            map.insert("invocation_semantic".to_string(), invocation_semantic);
+            map.insert("action".to_string(), 8.to_string());
+
+            // 序列化并发送请求
+            let result = send_request_and_receive_response(map, socket).unwrap();
+
+            // 处理响应数据
+            let status = result.get("status").unwrap();
+            if status == "200" {
+                Ok(Response::ResetFlights(Ok(())))
+            } else {
+                Ok(Response::ResetFlights(Err(result.get("message").unwrap().to_owned())))
+            }
+        }   
     }
 }
 
@@ -214,6 +270,9 @@ fn main() -> io::Result<()> {
         println!("  2 - query flight details");
         println!("  3 - reserve seats");
         println!("  4 - monitor flight");
+        println!("  6 - reserve seats cheapest price");
+        println!("  7 - reserve seats below price");
+        println!("  8 - reset flights");
         print!("Enter command: ");
         io::stdout().flush()?;
         io::stdin().read_line(&mut input)?;
@@ -299,6 +358,53 @@ fn main() -> io::Result<()> {
                 let result = value.as_map().unwrap();
                 println!("Received: {:?}", result);
             }
+        } else if message == "8" {
+            // 重置航班
+            let request = Request::ResetFlights;
+            let response = send_request(request, &socket)?;
+            println!("Result: {:?}", response);
+        } else if message == "6" {
+            // 预订最便宜座位
+            let mut input2 = String::new();
+            print!("Enter source: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut input2)?;
+            let source = input2.trim();
+            let mut input3 = String::new();
+            print!("Enter destination: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut input3)?;
+            let destination = input3.trim();
+            let request = Request::ReserveSeatsCheapestPrice {
+                source: source.to_string(),
+                destination: destination.to_string(),
+            };
+            let response = send_request(request, &socket)?;
+            println!("Result: {:?}", response);
+        } else if message == "7" {
+            // 预订低于指定价格的座位
+            let mut input2 = String::new(); 
+            print!("Enter source: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut input2)?;
+            let source = input2.trim(); 
+            let mut input3 = String::new();
+            print!("Enter destination: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut input3)?;
+            let destination = input3.trim();     
+            let mut input4 = String::new();
+            print!("Enter max_price: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut input4)?;
+            let max_price = input4.trim();  
+            let request = Request::ReserveSeatsBelowPrice {
+                source: source.to_string(),
+                destination: destination.to_string(),
+                max_price: max_price.parse().unwrap(),
+            };
+            let response = send_request(request, &socket)?;
+            println!("Result: {:?}", response);
         }
     }
 
