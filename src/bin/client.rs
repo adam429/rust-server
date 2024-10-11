@@ -24,8 +24,9 @@ fn gen_request_id() -> String {
     rand::thread_rng().gen_range(0..100000000).to_string()
 }
 
-
-
+/// 发送请求并接收响应
+/// 
+/// 这个函数处理请求的发送、重试和超时逻辑
 fn send_request_and_receive_response(map: HashMap<String, String>, socket: &UdpSocket) -> Result<HashMap<String, String>, io::Error> {
     let config = Config::load().expect("Failed to load config");
     let retry = config.client.retry;
@@ -47,12 +48,12 @@ fn send_request_and_receive_response(map: HashMap<String, String>, socket: &UdpS
 
     let mut received_result = None;
 
-
+    // 发送请求并等待响应
     loop {
         let start_time = Instant::now();
         let mut buffer = [0u8; 1024];
 
-        // 设置超时
+        // 在超时时间内尝试接收响应
         while start_time.elapsed() < timeout_duration {
             match socket.recv_from(&mut buffer) {
                 Ok((amt, _)) => {
@@ -77,6 +78,7 @@ fn send_request_and_receive_response(map: HashMap<String, String>, socket: &UdpS
             }
         }
 
+        // 处理接收结果
         if received_result.is_some() {
             break; // 收到响应，退出尝试循环
         } else {
@@ -92,6 +94,8 @@ fn send_request_and_receive_response(map: HashMap<String, String>, socket: &UdpS
 }
 
 /// 发送请求并处理响应
+/// 
+/// 这个函数根据不同的请求类型构建请求，发送请求，并处理响应
 fn send_request(request: Request, socket: &UdpSocket) -> Result<Response, io::Error> {
     let request_id = gen_request_id();
     let mut map = HashMap::new();
@@ -277,134 +281,143 @@ fn main() -> io::Result<()> {
         io::stdout().flush()?;
         io::stdin().read_line(&mut input)?;
 
+        // 处理用户输入
         let message = input.trim();
-        if message == "quit" {
-            break;
-        } else if message == "1" {
-            // 查询航班ID
-            let mut input2 = String::new();
-            print!("Enter source: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input2)?;
-            let mut input3 = String::new();
-            let source = input2.trim();
-            print!("Enter destination: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input3)?;
-            let destination = input3.trim();
-            let request = Request::QueryFlightIds {
-                source: source.to_string(),
-                destination: destination.to_string(),
-            };
-            let response = send_request(request, &socket)?;
-            println!("Result: {:?}", response);
-        } else if message == "2" {
-            // 查询航班详情
-            let mut input2 = String::new();
-            print!("Enter flight id: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input2)?;
-            let flight_id = input2.trim();
-            let request = Request::QueryFlightDetails {
-                flight_id: flight_id.parse().unwrap(),
-            };
-            let response = send_request(request, &socket)?;
-            println!("Result: {:?}", response);
-        } else if message == "3" {
-            // 预订座位
-            let mut input2 = String::new();
-            print!("Enter flight id: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input2)?;
-            let flight_id = input2.trim();
-            let mut input3 = String::new();
-            print!("Enter seats: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input3)?;
-            let seats = input3.trim();
-            let request = Request::ReserveSeats {
-                flight_id: flight_id.parse().unwrap(),
-                seats: seats.parse().unwrap(),
-            };
-            let response = send_request(request, &socket)?;
-            println!("Result: {:?}", response);
-        } else if message == "4" {
-            // 监控航班
-            let mut input2 = String::new();
-            print!("Enter flight id: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input2)?;
-            let flight_id = input2.trim();
-            let mut input3 = String::new();
-            print!("Enter monitor_interval: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input3)?;
-            let monitor_interval = input3.trim();
-            let request = Request::MonitorFlight {
-                flight_id: flight_id.parse().unwrap(),
-                monitor_interval: monitor_interval.parse().unwrap(),
-            };
-            let response = send_request(request, &socket)?;
-            println!("Result: {:?}", response);
+        match message {
+            "quit" => break,
+            "1" => {
+                // 查询航班ID
+                let mut input2 = String::new();
+                print!("Enter source: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input2)?;
+                let mut input3 = String::new();
+                let source = input2.trim();
+                print!("Enter destination: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input3)?;
+                let destination = input3.trim();
+                let request = Request::QueryFlightIds {
+                    source: source.to_string(),
+                    destination: destination.to_string(),
+                };
+                let response = send_request(request, &socket)?;
+                println!("Result: {:?}", response);
+            },
+            "2" => {
+                // 查询航班详情
+                let mut input2 = String::new();
+                print!("Enter flight id: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input2)?;
+                let flight_id = input2.trim();
+                let request = Request::QueryFlightDetails {
+                    flight_id: flight_id.parse().unwrap(),
+                };
+                let response = send_request(request, &socket)?;
+                println!("Result: {:?}", response);
+            },
+            "3" => {
+                // 预订座位
+                let mut input2 = String::new();
+                print!("Enter flight id: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input2)?;
+                let flight_id = input2.trim();
+                let mut input3 = String::new();
+                print!("Enter seats: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input3)?;
+                let seats = input3.trim();
+                let request = Request::ReserveSeats {
+                    flight_id: flight_id.parse().unwrap(),
+                    seats: seats.parse().unwrap(),
+                };
+                let response = send_request(request, &socket)?;
+                println!("Result: {:?}", response);
+            },
+            "4" => {
+                // 监控航班
+                let mut input2 = String::new();
+                print!("Enter flight id: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input2)?;
+                let flight_id = input2.trim();
+                let mut input3 = String::new();
+                print!("Enter monitor_interval: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input3)?;
+                let monitor_interval = input3.trim();
+                let request = Request::MonitorFlight {
+                    flight_id: flight_id.parse().unwrap(),
+                    monitor_interval: monitor_interval.parse().unwrap(),
+                };
+                let response = send_request(request, &socket)?;
+                println!("Result: {:?}", response);
 
-            // 持续接收监控更新
-            loop {
-                println!("Waiting for monitor update...");
-                let mut buffer = [0u8; 1024];
-                let (amt, _) = socket.recv_from(&mut buffer)?;
-                let received = &buffer[..amt];
-                let mut deserializer = Deserializer::new(received, ByteOrder::Little);
-                let value = deserializer.deserialize_next().unwrap();
-                let result = value.as_map().unwrap();
-                println!("Received: {:?}", result);
-            }
-        } else if message == "8" {
-            // 重置航班
-            let request = Request::ResetFlights;
-            let response = send_request(request, &socket)?;
-            println!("Result: {:?}", response);
-        } else if message == "6" {
-            // 预订最便宜座位
-            let mut input2 = String::new();
-            print!("Enter source: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input2)?;
-            let source = input2.trim();
-            let mut input3 = String::new();
-            print!("Enter destination: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input3)?;
-            let destination = input3.trim();
-            let request = Request::ReserveSeatsCheapestPrice {
-                source: source.to_string(),
-                destination: destination.to_string(),
-            };
-            let response = send_request(request, &socket)?;
-            println!("Result: {:?}", response);
-        } else if message == "7" {
-            // 预订低于指定价格的座位
-            let mut input2 = String::new(); 
-            print!("Enter source: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input2)?;
-            let source = input2.trim(); 
-            let mut input3 = String::new();
-            print!("Enter destination: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input3)?;
-            let destination = input3.trim();     
-            let mut input4 = String::new();
-            print!("Enter max_price: ");
-            io::stdout().flush()?;
-            io::stdin().read_line(&mut input4)?;
-            let max_price = input4.trim();  
-            let request = Request::ReserveSeatsBelowPrice {
-                source: source.to_string(),
-                destination: destination.to_string(),
-                max_price: max_price.parse().unwrap(),
-            };
-            let response = send_request(request, &socket)?;
-            println!("Result: {:?}", response);
+                // 持续接收监控更新
+                loop {
+                    println!("Waiting for monitor update...");
+                    let mut buffer = [0u8; 1024];
+                    let (amt, _) = socket.recv_from(&mut buffer)?;
+                    let received = &buffer[..amt];
+                    let mut deserializer = Deserializer::new(received, ByteOrder::Little);
+                    let value = deserializer.deserialize_next().unwrap();
+                    let result = value.as_map().unwrap();
+                    println!("Received: {:?}", result);
+                }
+            },
+            "8" => {
+                // 重置航班
+                let request = Request::ResetFlights;
+                let response = send_request(request, &socket)?;
+                println!("Result: {:?}", response);
+            },
+            "6" => {
+                // 预订最便宜座位
+                let mut input2 = String::new();
+                print!("Enter source: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input2)?;
+                let source = input2.trim();
+                let mut input3 = String::new();
+                print!("Enter destination: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input3)?;
+                let destination = input3.trim();
+                let request = Request::ReserveSeatsCheapestPrice {
+                    source: source.to_string(),
+                    destination: destination.to_string(),
+                };
+                let response = send_request(request, &socket)?;
+                println!("Result: {:?}", response);
+            },
+            "7" => {
+                // 预订低于指定价格的座位
+                let mut input2 = String::new(); 
+                print!("Enter source: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input2)?;
+                let source = input2.trim(); 
+                let mut input3 = String::new();
+                print!("Enter destination: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input3)?;
+                let destination = input3.trim();     
+                let mut input4 = String::new();
+                print!("Enter max_price: ");
+                io::stdout().flush()?;
+                io::stdin().read_line(&mut input4)?;
+                let max_price = input4.trim();  
+                let request = Request::ReserveSeatsBelowPrice {
+                    source: source.to_string(),
+                    destination: destination.to_string(),
+                    max_price: max_price.parse().unwrap(),
+                };
+                let response = send_request(request, &socket)?;
+                println!("Result: {:?}", response);
+            },
+            _ => println!("Unknown command"),
         }
     }
 

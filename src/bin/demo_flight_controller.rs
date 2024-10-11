@@ -6,13 +6,14 @@ use chrono::NaiveDateTime;
 mod controller;
 use controller::FlightController;
 
-
 fn main() {
+    // 创建UDP socket
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
+    // 初始化航班控制器
     let mut controller = FlightController::new();
 
-    // Add some sample flights
+    // 添加示例航班
     let flight0 = controller::Flight {
         flight_id: 0,
         source: "New York".to_string(),
@@ -43,10 +44,10 @@ fn main() {
     };
     controller.add_flight(flight2);
 
-    // Simulate client address
+    // 模拟客户端地址
     let client_addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
 
-    // Test QueryFlightIds
+    // 测试QueryFlightIds功能
     let request = controller::Request::QueryFlightIds {
         source: "New York".to_string(),
         destination: "London".to_string(),
@@ -61,67 +62,38 @@ fn main() {
     let response = controller.handle_request(request, &socket, Some(client_addr) );
     println!("QueryFlightIds (London->Paris) response: {:?}", response);
 
-
-    // Test QueryFlightDetails
+    // 测试QueryFlightDetails功能
     let request = controller::Request::QueryFlightDetails { flight_id: 1 };
     let response = controller.handle_request(request, &socket, Some(client_addr));
     println!("QueryFlightDetails (flight_id: 1) response: {:?}", response);
 
-    // Test ReserveSeats
+    // 测试ReserveSeats功能
     let request = controller::Request::ReserveSeats { flight_id: 1, seats: 2 };
     let response = controller.handle_request(request, &socket, Some(client_addr) );
     println!("ReserveSeats (flight_id: 1, seats: 2) response: {:?}", response);
 
-    // let request = controller::Request::ReserveSeats { flight_id: 0, seats: 50 };
-    // let response = controller.handle_request(request, &socket, Some(client_addr) );
-    // println!("ReserveSeats (flight_id: 0, seats: 50) response: {:?}", response);
-
-    // Test QueryFlightDetails
-    let request = controller::Request::QueryFlightDetails { flight_id: 1 };
-    let response = controller.handle_request(request, &socket, Some(client_addr) );
-    println!("QueryFlightDetails (flight_id: 1) response: {:?}", response);
-
-        // Test ReserveSeats
-    let request = controller::Request::ReserveSeats { flight_id: 1, seats: 999 };
-    let response = controller.handle_request(request, &socket, Some(client_addr)     );
-    println!("ReserveSeats (flight_id: 1, seats: 999) response: {:?}", response);
-
-
-    // Test MonitorFlight
+    // 测试MonitorFlight功能
     let request = controller::Request::MonitorFlight { flight_id: 1, monitor_interval: 1 };
     let response = controller.handle_request(request, &socket, Some(client_addr));
     println!("MonitorFlight (flight_id: 1, monitor_interval: 60) response: {:?}", response);
 
-        // Test ReserveSeats
-    let request = controller::Request::ReserveSeats { flight_id: 1, seats: 2 };
-    let response = controller.handle_request(request, &socket, Some(client_addr));
-    println!("ReserveSeats (flight_id: 1, seats: 2) response: {:?}", response);
+    // 测试多次ReserveSeats以触发MonitorFlight通知
+    for _ in 0..3 {
+        let request = controller::Request::ReserveSeats { flight_id: 1, seats: 2 };
+        let response = controller.handle_request(request, &socket, Some(client_addr));
+        println!("ReserveSeats (flight_id: 1, seats: 2) response: {:?}", response);
+        
+        // 延迟0.6秒
+        std::thread::sleep(std::time::Duration::from_millis(600));
+    }
 
-    // delay 0.6 seconds
-    std::thread::sleep(std::time::Duration::from_millis(600));
-
-    // Test ReserveSeats
-    let request = controller::Request::ReserveSeats { flight_id: 1, seats: 2 };
-    let response = controller.handle_request(request, &socket, Some(client_addr));
-    println!("ReserveSeats (flight_id: 1, seats: 2) response: {:?}", response);
-    
-    // delay 0.6 seconds
-    std::thread::sleep(std::time::Duration::from_millis(600));
-
-    // Test ReserveSeats
-    let request = controller::Request::ReserveSeats { flight_id: 1, seats: 2 };
-    let response = controller.handle_request(request, &socket, Some(client_addr) );
-    println!("ReserveSeats (flight_id: 1, seats: 2) response: {:?}", response);
-    
-
-
-    // Print final state of flights
+    // 打印航班的最终状态
     println!("Final state of flights:");
     for (id, flight) in controller.flights() {
         println!("Flight {}: {:?}", id, flight);
     }
 
-
+    // 测试ReserveSeatsCheapestPrice功能
     let request = controller::Request::ReserveSeatsCheapestPrice {        
         source: "New York".to_string(),
         destination: "London".to_string(),
@@ -129,12 +101,13 @@ fn main() {
     let response = controller.handle_request(request, &socket, Some(client_addr));
     println!("ReserveSeatsCheapestPrice (New York->London) response: {:?}", response);
 
+    // 打印航班的更新状态
     println!("Final state of flights:");
     for (id, flight) in controller.flights() {
         println!("Flight {}: {:?}", id, flight);
     }
 
-
+    // 测试ReserveSeatsBelowPrice功能
     let request = controller::Request::ReserveSeatsBelowPrice {        
         source: "New York".to_string(),
         destination: "London".to_string(),
@@ -143,16 +116,18 @@ fn main() {
     let response = controller.handle_request(request, &socket, Some(client_addr));
     println!("ReserveSeatsBelowPrice (New York->London) response: {:?}", response);
 
+    // 打印航班的最终状态
     println!("Final state of flights:");
     for (id, flight) in controller.flights() {
         println!("Flight {}: {:?}", id, flight);
     }
 
+    // 重置所有航班
     controller.reset_flights();
 
-    println!("Final state of flights:");
+    // 打印重置后的航班状态
+    println!("Final state of flights after reset:");
     for (id, flight) in controller.flights() {
         println!("Flight {}: {:?}", id, flight);
     }
-
 }
