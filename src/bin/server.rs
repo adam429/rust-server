@@ -62,16 +62,16 @@ fn init_flight_controller() -> FlightController {
     controller
 }
 
+// 定义请求信息结构体，用于存储请求的时间戳和响应
 struct RequestInfo {
     timestamp: NaiveDateTime,
     response: Vec<u8>,
 }
 
-// 创建一个全局的store_request
+// 创建一个全局的store_request，用于存储请求信息
 lazy_static::lazy_static! {
     static ref STORE_REQUEST: Arc<Mutex<HashMap<String, RequestInfo>>> = Arc::new(Mutex::new(HashMap::new()));
 }
-
 
 /// 主函数：启动UDP服务器并处理客户端请求
 fn main() -> Result<(), Box<dyn Error>> {
@@ -90,20 +90,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok((amt, src)) => {
                 let request_data = &buf[..amt];
 
+                // 反序列化请求数据
                 let mut deserializer = Deserializer::new(request_data, ByteOrder::Little);
                 let payload = deserializer.deserialize_next()?;
                 let payload = payload.as_map().ok_or("Invalid payload format")?;
 
+                // 提取请求ID和调用语义
                 let request_id = payload.get("request_id").unwrap().as_string().unwrap();
                 let invocation_semantic = payload.get("invocation_semantic").unwrap().as_string().unwrap();
                 println!("----------------------------------");
                 println!("request_id: {}", request_id);
                 println!("invocation_semantic: {}", invocation_semantic);
             
+                // 处理 at-least-once 语义
                 if invocation_semantic == "at-least-once" {
                     // 处理客户端请求
                     match handle_request(request_data, flight_controller, src, &socket) {
                         Ok(response) => {
+                            // 模拟网络丢包
                             let loss_rate = config.server.loss_rate;
                             let random_number = rand::random::<f32>();
 
@@ -122,15 +126,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                             } else {
                                 println!("Loss Rate Triggered: Dropped response");
                             }
-
                         }
                         Err(e) => {
                             eprintln!("Error processing request: {}", e);
                         }
                     }
                 }
+                // 处理 at-most-once 语义
                 if invocation_semantic == "at-most-once" {
-
                     let store = STORE_REQUEST.lock().unwrap();
                     if let Some(info) = store.get(request_id) {
                         // 如果已经处理过，直接发送存储的响应
@@ -162,7 +165,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                             }
                         }
                     }
-
                 }
             }
             Err(e) => {
@@ -346,9 +348,32 @@ fn reserve_seats_cheapest_price(payload: &HashMap<String, Value>, controller: &m
     let response = controller.handle_request(request, &socket, None);
     tracing::info!("response: {:?}", response); 
 
-    let mut data = HashMap::new();
-    data.insert("status".to_string(), "200".to_string());
-    Ok(data)
+    match response {
+        controller::Response::ReserveSeatsCheapestPrice(reservation_result) => {
+            if reservation_result.is_err() {
+                let mut data = HashMap::new();
+                data.insert("status".to_string(), "500".to_string());
+                data.insert("message".to_string(), reservation_result.err().unwrap());
+                return Ok(data)
+            } else {
+                let mut data = HashMap::new();
+                data.insert("status".to_string(), "200".to_string());
+                return Ok(data)
+            }
+        }
+        controller::Response::Error(e) => {
+            let mut data = HashMap::new();
+            data.insert("status".to_string(), "500".to_string());
+            data.insert("message".to_string(), e);
+            Ok(data)
+        }
+        _ => {
+            let mut data = HashMap::new();
+            data.insert("status".to_string(), "500".to_string());
+            data.insert("message".to_string(), "Unknown error".to_string());
+            return Ok(data)
+        }
+    }
 }
 
 fn reserve_seats_below_price(payload: &HashMap<String, Value>, controller: &mut FlightController, socket: &UdpSocket) -> Result<HashMap<String, String>, Box<dyn Error>> {
@@ -360,9 +385,32 @@ fn reserve_seats_below_price(payload: &HashMap<String, Value>, controller: &mut 
     let response = controller.handle_request(request, &socket, None);
     tracing::info!("response: {:?}", response);
 
-    let mut data = HashMap::new();
-    data.insert("status".to_string(), "200".to_string());
-    Ok(data)
+    match response {
+        controller::Response::ReserveSeatsBelowPrice(reservation_result) => {
+            if reservation_result.is_err() {
+                let mut data = HashMap::new();  
+                data.insert("status".to_string(), "500".to_string());
+                data.insert("message".to_string(), reservation_result.err().unwrap());
+                return Ok(data)
+            } else {
+                let mut data = HashMap::new();
+                data.insert("status".to_string(), "200".to_string());
+                return Ok(data)
+            }
+        }
+        controller::Response::Error(e) => {
+            let mut data = HashMap::new();
+            data.insert("status".to_string(), "500".to_string());
+            data.insert("message".to_string(), e);
+            return Ok(data)
+        }
+        _ => {
+            let mut data = HashMap::new();
+            data.insert("status".to_string(), "500".to_string());
+            data.insert("message".to_string(), "Unknown error".to_string());
+            return Ok(data)
+        }
+    }   
 }   
 
 /// 监控航班

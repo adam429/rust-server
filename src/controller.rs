@@ -33,6 +33,7 @@ impl FlightController {
 
         match request {
             Request::QueryFlightIds { source, destination } => {
+                // Query flight IDs based on source and destination
                 let ids = self.query_flight_ids(&source, &destination);
                 if ids.is_empty() {
                     Response::Error("No matching flights found".to_string())
@@ -52,9 +53,11 @@ impl FlightController {
                 }
             }
             Request::ReserveSeats { flight_id, seats } => {
+                // Reserve seats and handle monitoring updates
                 let result = self.reserve_seats(flight_id, seats);
                 match result {
                     Ok(_) => {
+                        // Prepare and send updates to monitoring clients
                         let updates = self.prepare_monitoring_updates(flight_id);
                         if !updates.is_empty() {
                             println!("Callback Triggered {:?}", updates);
@@ -84,6 +87,7 @@ impl FlightController {
                 }
             }
             Request::MonitorFlight { flight_id, monitor_interval } => {
+                // Start monitoring a flight for a client
                 let monitor_result = self.start_monitoring(flight_id, monitor_interval.try_into().unwrap(), client_addr.unwrap());
                 match monitor_result {
                     Ok(_) => Response::MonitoringStarted(Ok(())),
@@ -91,14 +95,23 @@ impl FlightController {
                 }
             }
             Request::ReserveSeatsCheapestPrice { source, destination } => {
+                // Reserve seats on the cheapest available flight
                 let result = self.reserve_seats_cheapest_price(&source, &destination);
-                Response::ReserveSeatsCheapestPrice(result)
+                match result {
+                    Ok(flight_id) => Response::ReserveSeatsCheapestPrice(Ok(flight_id)),
+                    Err(e) => Response::ReserveSeatsCheapestPrice(Err(e)),
+                }
             }
             Request::ReserveSeatsBelowPrice { source, destination, max_price } => {
+                // Reserve seats on flights below a specified price
                 let result = self.reserve_seats_below_price(&source, &destination, max_price);
-                Response::ReserveSeatsBelowPrice(result)
+                match result {
+                    Ok(flight_id) => Response::ReserveSeatsBelowPrice(Ok(flight_id)),
+                    Err(e) => Response::ReserveSeatsBelowPrice(Err(e)),
+                }
             }
             Request::ResetFlights => {
+                // Reset all flights to initial state
                 self.reset_flights();
                 Response::ResetFlights(Ok(()))
             }
@@ -173,23 +186,29 @@ impl FlightController {
         self.monitoring_clients.retain(|_, clients| !clients.is_empty());
     }
 
+    /// Reserves a seat on the cheapest available flight for the given route
     fn reserve_seats_cheapest_price(&mut self, source: &str, destination: &str) -> Result<(), String> {
+        // Find all matching flights
         let flight_ids: Vec<i32> = self.flights
             .iter()
             .filter(|(_, flight)| flight.source == source && flight.destination == destination)
             .map(|(id, _)| *id)
             .collect();
 
+        // Check if any matching flights exist
         if flight_ids.is_empty() {
             return Err("No matching flights found".to_string());
         }
 
+        // Filter flights with available seats
         let available_flight_ids: Vec<i32> = flight_ids.into_iter().filter(|id| self.flights[id].seats_available > 0).collect();
 
+        // Check if any flights have available seats
         if available_flight_ids.is_empty() {
             return Err("No seats available found".to_string());
         }
 
+        // Find the cheapest flight among available flights
         let cheapest_flight_id = *available_flight_ids.iter().min_by_key(|id| (self.flights[*id].airfare *100.0) as i32).unwrap();
 
         // Reserve the seat for the cheapest flight
